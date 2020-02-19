@@ -1,7 +1,7 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-// temperature
+// temperature 2
 
 #define ONE_WIRE_BUS 2
 #define TEMPERATURE_PRECISION 9
