@@ -8,6 +8,7 @@
 #define RELAY_3 12
 #define RELAY_4 13
 
+#define HEAT_LIMIT 20
 // temperature
 
 #define FLOW_METER_BUS_1 2
@@ -158,8 +159,15 @@ void printAddress(DeviceAddress deviceAddress) {
   }
 }
 
-void printTemperature(DallasTemperature sensor, DeviceAddress deviceAddress) {
+void printTemperature(DallasTemperature sensor, DeviceAddress deviceAddress, bool heat = false) {
   float tempC = sensor.getTempC(deviceAddress);
+  if (heat) {
+    if (tempC > HEAT_LIMIT) {
+      digitalWrite(RELAY_1, LOW);
+    } else {
+      digitalWrite(RELAY_1, HIGH);
+    }
+  }
   Serial.print("Temp C: ");
   Serial.print(tempC);
 }
@@ -170,11 +178,11 @@ void printResolution(DallasTemperature sensor, DeviceAddress deviceAddress) {
   Serial.println();
 }
 
-void printData(DallasTemperature sensor, DeviceAddress deviceAddress) {
+void printData(DallasTemperature sensor, DeviceAddress deviceAddress, bool heat = false) {
   Serial.print("Device Address: ");
   printAddress(deviceAddress);
   Serial.print(" ");
-  printTemperature(sensor, deviceAddress);
+  printTemperature(sensor, deviceAddress, heat);
   Serial.println();
 }
 
@@ -224,7 +232,7 @@ void loop(void) {
       sensors1.requestTemperatures();
       Serial.println("Temperature sensors data:");
       for (int i = 0; i < sizeof(addresses1); i++) {
-        printData(sensors1, addresses1[i]);
+        printData(sensors1, addresses1[i], i == 0);
       }
       sensors2.requestTemperatures();
       Serial.println("Temperature sensors data:");
