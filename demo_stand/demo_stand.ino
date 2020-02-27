@@ -1,149 +1,173 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-#define HEAT_TEMP 25
+//------НАСТРОЙКИ. МОЖНО (И НУЖНО) МЕНЯТЬ---------
+#define HEAT_LIMIT 20
+#define START_DUTY_CYCLE 100
 
+
+// heat
 #define RELAY_1 10
 #define RELAY_2 11
+
+//fan
 #define RELAY_3 12
 #define RELAY_4 13
 
-#define HEAT_LIMIT 20
 // temperature
-
-#define FLOW_METER_BUS_1 2
-#define FLOW_METER_BUS_2 3
-
 #define ONE_WIRE_BUS_1 4
 #define ONE_WIRE_BUS_2 7
 #define TEMPERATURE_PRECISION 9
 
-OneWire oneWire1(ONE_WIRE_BUS_1);
-OneWire oneWire2(ONE_WIRE_BUS_2);
+OneWire one_wire_1(ONE_WIRE_BUS_1);
+OneWire one_wire_2(ONE_WIRE_BUS_2);
 
-DallasTemperature sensors1(&oneWire1);
-DallasTemperature sensors2(&oneWire2);
+DallasTemperature temp_sensors_1(&one_wire_1);
+DallasTemperature temp_sensors_2(&one_wire_2);
 
-DeviceAddress addresses1[2] = {
+DeviceAddress temp_addresses_1[2] = {
   { 0x28, 0xAA, 0x80, 0x16, 0x56, 0x14, 0x01, 0x54 },
   { 0x28, 0xAA, 0xF6, 0x2E, 0x56, 0x14, 0x01, 0xF1 }
 };
 
-DeviceAddress addresses2[2] = {
+DeviceAddress temp_addresses_2[2] = {
   { 0x28, 0xAA, 0xF9, 0xED, 0x3F, 0x14, 0x01, 0x04 },
   { 0x28, 0xAA, 0x7F, 0xBA, 0x56, 0x14, 0x01, 0x26 }
 };
 
 // flow
+#define FLOW_METER_BUS_1 2
+#define FLOW_METER_BUS_2 3
 
-volatile int flow1_frequency;
-volatile int flow2_frequency;
+volatile int flow_frequency_1;
+volatile int flow_frequency_2;
 
-unsigned int l_hour1;
-unsigned int l_hour2;
+unsigned int l_hour_1;
+unsigned int l_hour_2;
 
 unsigned long currentTime;
-unsigned long cloopTime1;
-unsigned long cloopTime2;
+unsigned long cloop_time_1;
+unsigned long cloop_time_2;
 
-void flow1 () {
-   flow1_frequency++;
+void flow_1 () {
+   flow_frequency_1++;
 }
 
-void flow2 () {
-   flow2_frequency++;
+void flow_2 () {
+   flow_frequency_2++;
 }
 
-// Pump 
-
+// pump 
 #define PWM_PIN 5
-#define START_DUTY_CYCLE 100
+
+void test_relay(void) {
+  Serial.println("Testing relays...");
+  for (int i = 0; i < 4; i++) {
+    delay(500);
+    digitalWrite(RELAY_1, LOW);
+    digitalWrite(RELAY_2, LOW);
+    digitalWrite(RELAY_3, LOW);
+    digitalWrite(RELAY_4, LOW);
+    delay(500);
+    digitalWrite(RELAY_1, HIGH);
+    digitalWrite(RELAY_2, HIGH);
+    digitalWrite(RELAY_3, HIGH);
+    digitalWrite(RELAY_4, HIGH);
+  }
+  Serial.println("Testing relays OK");
+}
 
 void setup(void) {
-
-  pinMode(RELAY_1, OUTPUT);
-  digitalWrite(RELAY_1, HIGH);
-  pinMode(RELAY_2, OUTPUT);
-  digitalWrite(RELAY_2, HIGH);
-  pinMode(RELAY_3, OUTPUT);
-  digitalWrite(RELAY_3, HIGH);
-  pinMode(RELAY_4, OUTPUT);
-  digitalWrite(RELAY_4, HIGH);
-  
   Serial.begin(115200);
   Serial.println("Sensors deamo board starting...");
+  
+  Serial.println("Configuring relays...");
+  pinMode(RELAY_1, OUTPUT);
+  pinMode(RELAY_2, OUTPUT);
+  pinMode(RELAY_3, OUTPUT);
+  pinMode(RELAY_4, OUTPUT);
+  Serial.println("Configuring relays OK");
+  test_relay();
 
   // temperature
-  sensors1.begin();
-  sensors2.begin();
+  temp_sensors_1.begin();
+  temp_sensors_2.begin();
 
   Serial.print("Locating temperature sensors...");
   Serial.print("Found ");
-  Serial.print(sensors1.getDeviceCount(), DEC);
-  Serial.print(sensors2.getDeviceCount(), DEC);
+  Serial.print(temp_sensors_1.getDeviceCount(), DEC);
+  Serial.print(temp_sensors_2.getDeviceCount(), DEC);
   Serial.println(" devices");
 
-  Serial.print("Temperature sensors parasite power is: ");
-  if (sensors1.isParasitePowerMode()) Serial.println("ON");
-  else Serial.println("OFF");
-  if (sensors2.isParasitePowerMode()) Serial.println("ON");
+  Serial.print("Temperature sensors 1 parasite power is: ");
+  if (temp_sensors_1.isParasitePowerMode()) Serial.println("ON");
   else Serial.println("OFF");
 
-  for (byte i = 0; i < sizeof(addresses1); i++) {
-    if (!sensors1.getAddress(addresses1[i], i)) Serial.println("Unable to find address for temperature sensor " + i);
+  Serial.print("Temperature sensors 2 parasite power is: ");
+  if (temp_sensors_2.isParasitePowerMode()) Serial.println("ON");
+  else Serial.println("OFF");
+
+  for (int i = 0; i < 2; i++) {
+    if (!temp_sensors_1.getAddress(temp_addresses_1[i], i)) {
+      Serial.print("Unable to find address for temperature sensor ");
+      printAddress(temp_addresses_1[i]);
+      Serial.println();
+    }
 
     Serial.print("Temperature sensor ");
     Serial.print(i);
     Serial.print(" address: ");
-    printAddress(addresses1[i]);
+    printAddress(temp_addresses_1[i]);
     Serial.println();
 
-    sensors1.setResolution(addresses1[i], TEMPERATURE_PRECISION);
+    temp_sensors_1.setResolution(temp_addresses_1[i], TEMPERATURE_PRECISION);
 
     Serial.print("Temperature sensor ");
     Serial.print(i);
     Serial.print(" resolution: ");
-    Serial.print(sensors1.getResolution(addresses1[i]), DEC);
+    Serial.print(temp_sensors_1.getResolution(temp_addresses_1[i]), DEC);
     Serial.println();
-    Serial.println("Temperature sensors OK");
+    Serial.println("Temperature sensors 1 OK");
   }
 
-  for (byte i = 0; i < sizeof(addresses2); i++) {
-    if (!sensors2.getAddress(addresses2[i], i)) Serial.println("Unable to find address for temperature sensor " + i);
+  for (int i = 0; i < 2; i++) {
+    if (!temp_sensors_2.getAddress(temp_addresses_2[i], i)) {
+      Serial.print("Unable to find address for temperature sensor ");
+      printAddress(temp_addresses_2[i]);
+      Serial.println();
+    }
 
     Serial.print("Temperature sensor ");
     Serial.print(i);
     Serial.print(" address: ");
-    printAddress(addresses2[i]);
+    printAddress(temp_addresses_2[i]);
     Serial.println();
 
-    sensors2.setResolution(addresses2[i], TEMPERATURE_PRECISION);
+    temp_sensors_2.setResolution(temp_addresses_2[i], TEMPERATURE_PRECISION);
 
     Serial.print("Temperature sensor ");
     Serial.print(i);
     Serial.print(" resolution: ");
-    Serial.print(sensors2.getResolution(addresses2[i]), DEC);
+    Serial.print(temp_sensors_2.getResolution(temp_addresses_2[i]), DEC);
     Serial.println();
-    Serial.println("Temperature sensors OK");
+    Serial.println("Temperature sensors 2 OK");
   }
 
   // flow
-
   Serial.println("Flow sensor setup...");
   pinMode(FLOW_METER_BUS_1, INPUT);
   pinMode(FLOW_METER_BUS_2, INPUT);
   digitalWrite(FLOW_METER_BUS_1, HIGH);
   digitalWrite(FLOW_METER_BUS_2, HIGH);
-  attachInterrupt(0, flow1, RISING);
-  attachInterrupt(1, flow2, RISING);
+  attachInterrupt(0, flow_1, RISING);
+  attachInterrupt(1, flow_2, RISING);
   sei();
   currentTime = millis();
-  cloopTime1 = currentTime;
-  cloopTime2 = currentTime;
+  cloop_time_1 = currentTime;
+  cloop_time_2 = currentTime;
   Serial.println("Flow sensors OK");
 
   // Pump 
-
   Serial.println("Pump enabling...");
   analogWrite(START_DUTY_CYCLE, PWM_PIN);
   Serial.print("Pump enabled on ");
@@ -164,8 +188,10 @@ void printTemperature(DallasTemperature sensor, DeviceAddress deviceAddress, boo
   if (heat) {
     if (tempC > HEAT_LIMIT) {
       digitalWrite(RELAY_1, LOW);
+      digitalWrite(RELAY_2, LOW);
     } else {
       digitalWrite(RELAY_1, HIGH);
+      digitalWrite(RELAY_2, HIGH);
     }
   }
   Serial.print("Temp C: ");
@@ -187,58 +213,71 @@ void printData(DallasTemperature sensor, DeviceAddress deviceAddress, bool heat 
 }
 
 void loop(void) {
-  // PWM pump
-
   if (Serial.available()) {
     String line = Serial.readString();
     if (line.indexOf("PWM: ") >= 0) {
-      String numberStr = line.substring(line.indexOf("PWM: "), line.length());
+      String numberStr = line.substring(line.indexOf(':') + 1);
       int number = numberStr.toInt();
       if (number < 0) { number = 0; }
       if (number > 255) { number = 255; }
       analogWrite(number, PWM_PIN);
       Serial.print("Pump changed to ");
       Serial.print((float)number/255.0 * 100.0);
-      Serial.print("% duty cycle OK");
+      Serial.println("% duty cycle OK");
     }
+    else if (line.indexOf("ON") >= 0) {
+        digitalWrite(RELAY_3, LOW);
+        digitalWrite(RELAY_4, LOW);
+      }
+     else if (line.indexOf("OFF") >= 0) {
+      digitalWrite(RELAY_3, HIGH);
+      digitalWrite(RELAY_4, HIGH);
+     }
   }
   
-  // flow
   boolean flag = false;
   currentTime = millis();
-  if(currentTime >= (cloopTime1 + 1000))
+
+  if(currentTime >= (cloop_time_1 + 1000))
   {
-    cloopTime1 = currentTime;
-    l_hour1 = (flow1_frequency * 60 / 7.5);
-    flow1_frequency = 0;
-    Serial.println("Flow 1 sensors data:");
-    Serial.print(l_hour1, DEC);
-    Serial.println(" L/hour");
+    cloop_time_1 = currentTime;
+    l_hour_1 = (flow_frequency_1 * 60 / 7.5);
+    flow_frequency_1 = 0;
+    Serial.print("Flow 1 sensors data: ");
+    Serial.print(l_hour_1, DEC);
+    Serial.print(" L/hour");
+    Serial.print((float)(l_hour_1 / 60 * 1000), DEC);
+    Serial.println(" mL/min");
     flag = true;
   }
-  if(currentTime >= (cloopTime2 + 1000))
+
+  if(currentTime >= (cloop_time_2 + 1000))
   {
-    cloopTime2 = currentTime;
-    l_hour2 = (flow2_frequency * 60 / 7.5);
-    flow2_frequency = 0;
-    Serial.println("Flow 2 sensors data:");
-    Serial.print(l_hour2, DEC);
-    Serial.println(" L/hour");
+    cloop_time_2 = currentTime;
+    l_hour_2 = (flow_frequency_2 * 60 / 7.5);
+    flow_frequency_2 = 0;
+    Serial.print("Flow 2 sensors data: ");
+    Serial.print(l_hour_2, DEC);
+    Serial.print(" L/hour, ");
+    Serial.print((float)(l_hour_2 / 60 * 1000), DEC);
+    Serial.println(" mL/min");
     flag = true;
   }
  
   // temperature
   if (flag) {
-      sensors1.requestTemperatures();
-      Serial.println("Temperature sensors data:");
-      for (int i = 0; i < sizeof(addresses1); i++) {
-        printData(sensors1, addresses1[i], i == 0);
+      temp_sensors_1.requestTemperatures();
+      Serial.println("Temperature sensors 1 data: ");
+      for (int i = 0; i < 2; i++) {
+        printData(temp_sensors_1, temp_addresses_1[i], i == 0);
       }
-      sensors2.requestTemperatures();
-      Serial.println("Temperature sensors data:");
-      for (int i = 0; i < sizeof(addresses2); i++) {
-        printData(sensors2, addresses2[i]);
+
+      temp_sensors_2.requestTemperatures();
+      Serial.println("Temperature sensors 2 data: ");
+      for (int i = 0; i < 2; i++) {
+        printData(temp_sensors_2, temp_addresses_2[i], i == 0);
       }
+
       flag = false;
   }
 }
